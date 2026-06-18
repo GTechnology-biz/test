@@ -12,6 +12,7 @@
   const commonPct = el("commonPct");
   const commonPctVal = el("commonPctVal");
   const freeSpace = el("freeSpace");
+  const gameType = el("gameType");
   const customItems = el("customItems");
   const generateBtn = el("generate");
   const status = el("status");
@@ -110,6 +111,57 @@
     doc.lines(deltas, pts[0][0], pts[0][1], [1, 1], "F", true);
   }
 
+  // Game types: winning patterns. `name` and `desc` are printed on the card.
+  const GAMES = {
+    line:     { name: "Line",          desc: "Fill any full row, column, or diagonal" },
+    corners:  { name: "Four Corners",  desc: "Fill all four corner squares" },
+    letterT:  { name: "Letter T",      desc: "Fill the top row and the middle column" },
+    letterX:  { name: "Letter X",      desc: "Fill both diagonals" },
+    plus:     { name: "Plus Sign",     desc: "Fill the middle row and middle column" },
+    frame:    { name: "Picture Frame", desc: "Fill the entire outer border" },
+    blackout: { name: "Blackout",      desc: "Fill every square on the card" },
+  };
+
+  // Set of cell indices that illustrate a pattern on a `grid`×`grid` board.
+  function maskFor(id, grid) {
+    const n = grid, mid = Math.floor(n / 2), m = new Set();
+    const add = (r, c) => m.add(r * n + c);
+    switch (id) {
+      case "line": for (let c = 0; c < n; c++) add(0, c); break; // a sample row
+      case "corners": add(0, 0); add(0, n - 1); add(n - 1, 0); add(n - 1, n - 1); break;
+      case "letterT":
+        for (let c = 0; c < n; c++) add(0, c);
+        for (let r = 0; r < n; r++) add(r, mid);
+        break;
+      case "letterX":
+        for (let i = 0; i < n; i++) { add(i, i); add(i, n - 1 - i); }
+        break;
+      case "plus":
+        for (let c = 0; c < n; c++) add(mid, c);
+        for (let r = 0; r < n; r++) add(r, mid);
+        break;
+      case "frame":
+        for (let c = 0; c < n; c++) { add(0, c); add(n - 1, c); }
+        for (let r = 0; r < n; r++) { add(r, 0); add(r, n - 1); }
+        break;
+      case "blackout": for (let i = 0; i < n * n; i++) m.add(i); break;
+    }
+    return m;
+  }
+
+  // Small grid diagram with the target cells highlighted.
+  function drawPatternIcon(doc, x, y, size, grid, mask) {
+    const cs = size / grid;
+    doc.setLineWidth(0.4);
+    draw(doc, C.line);
+    for (let r = 0; r < grid; r++) {
+      for (let c = 0; c < grid; c++) {
+        fill(doc, mask.has(r * grid + c) ? C.accent : C.altFill);
+        doc.rect(x + c * cs, y + r * cs, cs, cs, "FD");
+      }
+    }
+  }
+
   // Fit a word into a cell: wrap + shrink font; returns {lines, fontSize, lineH}.
   function fitText(doc, word, maxW, maxH, startSize) {
     let fontSize = startSize;
@@ -123,7 +175,7 @@
     return { lines, fontSize, lineH: fontSize + 2 };
   }
 
-  function drawCard(doc, title, slots, grid, cardNum, total) {
+  function drawCard(doc, title, slots, grid, cardNum, total, game) {
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const margin = 36;
@@ -163,7 +215,7 @@
     doc.text("Spot it  •  mark it  •  shout BINGO!", pageW / 2, taglineY, { align: "center" });
 
     // Footer layout reserved at the bottom.
-    const footerH = 34;
+    const footerH = 42;
     const footerTop = frameY + frameH - pad - footerH;
 
     // Grid geometry — centered in the space between tagline and footer.
@@ -213,27 +265,32 @@
       }
     }
 
-    // Footer: divider, play instructions, card number.
+    // Footer: divider, pattern diagram, game name + rule, card number.
     draw(doc, C.line);
     doc.setLineWidth(0.6);
-    doc.line(contentX, footerTop + 6, contentX + contentW, footerTop + 6);
+    doc.line(contentX, footerTop + 4, contentX + contentW, footerTop + 4);
+
+    const fMid = footerTop + 4 + (footerH - 4) / 2;
+    const iconSize = Math.min(30, footerH - 12);
+    drawPatternIcon(doc, contentX, fMid - iconSize / 2, iconSize, grid, maskFor(game.id, grid));
+
+    const textX = contentX + iconSize + 12;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    text(doc, C.primary);
+    doc.text("How to win — " + game.name, textX, fMid - 3, { baseline: "middle" });
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9.5);
+    doc.setFontSize(9);
     text(doc, C.muted);
-    doc.text(
-      "First to fill a full row, column, or diagonal wins!",
-      pageW / 2,
-      footerTop + 22,
-      { align: "center" }
-    );
+    doc.text(game.desc + ".", textX, fMid + 11, { baseline: "middle" });
+
     if (total > 1) {
       doc.setFontSize(8.5);
-      doc.text(
-        "Card " + cardNum + " of " + total,
-        contentX + contentW,
-        footerTop + 22,
-        { align: "right" }
-      );
+      text(doc, C.muted);
+      doc.text("Card " + cardNum + " of " + total, contentX + contentW, fMid, {
+        align: "right",
+        baseline: "middle",
+      });
     }
   }
 
@@ -248,6 +305,8 @@
       const freeIndex = useFree ? Math.floor(cells / 2) : -1;
       const fillableCells = cells - (useFree ? 1 : 0);
       const pct = parseInt(commonPct.value, 10) || 0;
+      const gameId = GAMES[gameType.value] ? gameType.value : "line";
+      const game = { id: gameId, name: GAMES[gameId].name, desc: GAMES[gameId].desc };
 
       // Word pool: built-in + custom, de-duplicated.
       const custom = parseCustom(customItems.value);
@@ -282,7 +341,7 @@
       for (let i = 0; i < numCards; i++) {
         if (i > 0) doc.addPage();
         const slots = buildCard(commonItems, fillPool, cells, useFree, freeIndex);
-        drawCard(doc, title, slots, grid, i + 1, numCards);
+        drawCard(doc, title, slots, grid, i + 1, numCards, game);
       }
 
       const safeTitle = title.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "bingo";

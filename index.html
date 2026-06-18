@@ -46,7 +46,7 @@
   .field:last-child { margin-bottom: 0; }
   label { display: block; font-weight: 600; margin-bottom: .35rem; }
   label .hint { display: block; font-weight: 400; font-size: .85rem; color: var(--muted); margin-top: .1rem; }
-  input[type="text"], input[type="number"], textarea {
+  input[type="text"], input[type="number"], textarea, select {
     width: 100%;
     padding: .6rem .7rem;
     font-size: 1rem;
@@ -56,7 +56,8 @@
     background: #fff;
     color: var(--text);
   }
-  input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  select { cursor: pointer; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
   textarea { min-height: 90px; resize: vertical; }
   .row { display: flex; gap: 1rem; flex-wrap: wrap; }
   .row .field { flex: 1; min-width: 180px; }
@@ -118,6 +119,21 @@
         </label>
         <input type="number" id="gridSize" value="5" min="3" max="6">
       </div>
+    </div>
+
+    <div class="field">
+      <label for="gameType">Game type
+        <span class="hint">The winning pattern — its name, rule, and a diagram are printed on every card.</span>
+      </label>
+      <select id="gameType">
+        <option value="line">Line — any row, column, or diagonal</option>
+        <option value="corners">Four corners</option>
+        <option value="letterT">Letter T</option>
+        <option value="letterX">Letter X</option>
+        <option value="plus">Plus sign (+)</option>
+        <option value="frame">Picture frame (outer edge)</option>
+        <option value="blackout">Blackout (whole card)</option>
+      </select>
     </div>
 
     <div class="field">
