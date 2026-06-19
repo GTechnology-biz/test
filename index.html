@@ -87,6 +87,21 @@
   details { margin-top: 1.25rem; }
   summary { cursor: pointer; font-weight: 600; color: var(--accent); }
   .wordlist-preview { font-size: .85rem; color: var(--muted); margin-top: .5rem; }
+  .wordlist-help { font-size: .85rem; color: var(--muted); margin: .6rem 0 .2rem; }
+  .wordlist-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
+  .chip {
+    font-size: .8rem; padding: .22rem .55rem; border-radius: 999px;
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    cursor: pointer; user-select: none; transition: background .12s ease, border-color .12s ease, color .12s ease;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip.always { background: #e3f7ec; border-color: #2e9e57; color: #1e7e3c; font-weight: 600; }
+  .chip.always::before { content: "\2605\00a0"; }
+  .chip.blocked { background: #fdecea; border-color: #e0796d; color: #c0392b; text-decoration: line-through; }
+  .chip.blocked::before { content: "\2715\00a0"; }
+  .chip-tag { display: inline-block; padding: 0 .4rem; border-radius: 999px; font-size: .78rem; border: 1px solid var(--border); }
+  .chip-tag.always { background: #e3f7ec; color: #1e7e3c; border-color: #2e9e57; }
+  .chip-tag.blocked { background: #fdecea; color: #c0392b; border-color: #e0796d; }
   footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 0 1rem 2rem; }
   footer a { color: var(--accent); }
 </style>
@@ -148,7 +163,14 @@
 
     <div class="field checkbox-field">
       <input type="checkbox" id="freeSpace" checked>
-      <label for="freeSpace">Include a FREE center space (odd grids only)</label>
+      <label for="freeSpace">Include a free center space (odd grids only)</label>
+    </div>
+
+    <div class="field" id="freeLabelField">
+      <label for="freeLabel">Center space label
+        <span class="hint">Shown in the pre-marked center square. Leave as <strong>FREE</strong>, or set a custom word that everyone starts with.</span>
+      </label>
+      <input type="text" id="freeLabel" value="FREE" maxlength="24">
     </div>
 
     <div class="field">
@@ -163,7 +185,12 @@
 
     <details>
       <summary>Built-in word list (<span id="defaultCount">0</span> items)</summary>
-      <div class="wordlist-preview" id="defaultPreview"></div>
+      <p class="wordlist-help">
+        Click a word to cycle it: normal &rarr;
+        <span class="chip-tag always">on every card</span> &rarr;
+        <span class="chip-tag blocked">blocked</span> &rarr; normal.
+      </p>
+      <div class="wordlist-chips" id="defaultChips"></div>
     </details>
   </div>
 </main>

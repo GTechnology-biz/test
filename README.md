@@ -12,10 +12,13 @@ cards. It runs entirely in the browser, so it can be hosted for free on
   things" play)
 - Add your own **custom items**, mixed in with a built-in list of ~100 road-trip
   sightings
+- **Fine-tune the built-in list**: click any word to pin it to *every* card or
+  block it from *all* cards
 - Set a **custom title** printed on every card
-- Optional **FREE** center space
+- Optional **free center space** — keep the classic **FREE**, or give it a
+  custom word that every player starts with already marked
 - Generates a single **PDF** containing all the cards (one card per page),
-  ready to print
+  ready to print, with **B-I-N-G-O** column headers and a printed win condition
 
 Everything happens in your browser — nothing is uploaded anywhere.
 
@@ -53,6 +56,11 @@ Everything happens in your browser — nothing is uploaded anywhere.
 
 Open `words.json` and edit the JSON array of strings. The app fetches this list
 at startup and picks from it plus any custom items you enter in the form.
+
+You can also adjust the list without editing the file: expand **Built-in word
+list** in the app and click a word to cycle it through *normal → on every card →
+blocked → normal*. Pinned words appear on every card; blocked words are left out
+entirely.
 
 ## Running locally
 

@@ -12,13 +12,46 @@
   const commonPct = el("commonPct");
   const commonPctVal = el("commonPctVal");
   const freeSpace = el("freeSpace");
+  const freeLabelField = el("freeLabelField");
+  const freeLabelInput = el("freeLabel");
   const gameType = el("gameType");
   const customItems = el("customItems");
   const generateBtn = el("generate");
   const status = el("status");
+  const chipsContainer = el("defaultChips");
 
   // Built-in word list, loaded from words.json at startup.
   let DEFAULT_WORDS = [];
+
+  // Per-word overrides chosen in the word-list viewer.
+  //  - always:  word appears on EVERY card
+  //  - blocked: word is excluded from ALL cards
+  // A word is in at most one of these.
+  const alwaysWords = new Set();
+  const blockedWords = new Set();
+
+  // Render the built-in list as clickable chips that cycle through states.
+  function renderChips() {
+    chipsContainer.innerHTML = "";
+    DEFAULT_WORDS.forEach((word) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = word;
+      if (alwaysWords.has(word)) chip.classList.add("always");
+      else if (blockedWords.has(word)) chip.classList.add("blocked");
+      chip.title =
+        alwaysWords.has(word) ? "On every card — click to block"
+        : blockedWords.has(word) ? "Blocked — click to reset"
+        : "Click to put on every card";
+      chip.addEventListener("click", () => {
+        if (alwaysWords.has(word)) { alwaysWords.delete(word); blockedWords.add(word); }
+        else if (blockedWords.has(word)) { blockedWords.delete(word); }
+        else { alwaysWords.add(word); }
+        renderChips();
+      });
+      chipsContainer.appendChild(chip);
+    });
+  }
 
   generateBtn.disabled = true;
   fetch("words.json")
@@ -30,7 +63,7 @@
       if (!Array.isArray(words)) throw new Error("words.json is not an array");
       DEFAULT_WORDS = words;
       el("defaultCount").textContent = DEFAULT_WORDS.length;
-      el("defaultPreview").textContent = DEFAULT_WORDS.join(" · ");
+      renderChips();
       generateBtn.disabled = false;
     })
     .catch((err) => {
@@ -46,6 +79,13 @@
   commonPct.addEventListener("input", () => {
     commonPctVal.textContent = commonPct.value + "%";
   });
+
+  // The center-label input only matters when a free space is enabled.
+  function syncFreeLabel() {
+    freeLabelField.style.display = freeSpace.checked ? "" : "none";
+  }
+  freeSpace.addEventListener("change", syncFreeLabel);
+  syncFreeLabel();
 
   // ---- Helpers ----
   function shuffle(arr) {
@@ -100,7 +140,7 @@
     while (p < positions.length) {
       slots[positions[p++]] = pool[f++ % pool.length];
     }
-    if (useFree) slots[freeIndex] = "FREE";
+    // The center/free cell (if any) is left empty here and drawn specially.
     return slots;
   }
 
@@ -111,9 +151,13 @@
     primary:  [37, 99, 175],
     primaryDk:[24, 71, 130],
     accent:   [231, 124, 38],
+    accentDk: [196, 96, 18],
     altFill:  [238, 243, 250],
+    warmFill: [253, 246, 235],
     line:     [196, 208, 224],
     muted:    [128, 138, 154],
+    bg:       [247, 250, 254],
+    shadow:   [210, 219, 232],
     white:    [255, 255, 255],
   };
   const fill = (doc, c) => doc.setFillColor(c[0], c[1], c[2]);
@@ -197,7 +241,13 @@
     return { lines, fontSize, lineH: fontSize + 2 };
   }
 
-  function drawCard(doc, title, slots, grid, cardNum, total, game) {
+  // Letter shown above each grid column, mapped from "BINGO" across the width.
+  function columnLetter(c, grid) {
+    const L = "BINGO";
+    return L[Math.min(L.length - 1, Math.floor((c * L.length) / grid))];
+  }
+
+  function drawCard(doc, title, slots, grid, cardNum, total, game, freeIndex, freeLabel) {
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const margin = 36;
@@ -207,6 +257,10 @@
     const contentX = frameX + pad;
     const contentW = frameW - pad * 2;
 
+    // Soft page tint behind everything.
+    fill(doc, C.bg);
+    doc.rect(0, 0, pageW, pageH, "F");
+
     // Decorative double frame.
     doc.setLineWidth(2);
     draw(doc, C.primary);
@@ -215,9 +269,16 @@
     draw(doc, C.line);
     doc.roundedRect(frameX + 5, frameY + 5, frameW - 10, frameH - 10, 9, 9, "S");
 
-    // Title banner.
+    // Little star flourishes tucked into the four corners.
+    [[frameX + 14, frameY + 14], [frameX + frameW - 14, frameY + 14],
+     [frameX + 14, frameY + frameH - 14], [frameX + frameW - 14, frameY + frameH - 14]]
+      .forEach(([sx, sy]) => star(doc, sx, sy, 5, 2.1, C.accent));
+
+    // Title banner with a soft drop shadow.
     const bannerY = frameY + pad;
     const bannerH = 50;
+    fill(doc, C.shadow);
+    doc.roundedRect(contentX, bannerY + 3, contentW, bannerH, 9, 9, "F");
     fill(doc, C.primary);
     doc.roundedRect(contentX, bannerY, contentW, bannerH, 9, 9, "F");
     doc.setFont("helvetica", "bold");
@@ -229,8 +290,10 @@
       doc.text(line, pageW / 2, tStartY + i * tFit.lineH, { align: "center" })
     );
 
-    // Tagline under banner.
-    const taglineY = bannerY + bannerH + 16;
+    // Accent bar + tagline under the banner.
+    fill(doc, C.accent);
+    doc.roundedRect(pageW / 2 - 38, bannerY + bannerH + 5, 76, 4, 2, 2, "F");
+    const taglineY = bannerY + bannerH + 24;
     doc.setFont("helvetica", "italic");
     doc.setFontSize(10.5);
     text(doc, C.muted);
@@ -240,41 +303,71 @@
     const footerH = 42;
     const footerTop = frameY + frameH - pad - footerH;
 
-    // Grid geometry — centered in the space between tagline and footer.
-    const availTop = taglineY + 14;
+    // Grid geometry — a column-letter strip sits above a centered square grid.
+    const gap = 3;
+    const availTop = taglineY + 12;
     const availH = footerTop - availTop;
-    const cell = Math.min(contentW / grid, availH / grid);
+    const stripGap = 8;
+    const cell = Math.min(contentW / grid, (availH - stripGap) / (grid + 0.7));
+    const stripH = Math.min(26, cell * 0.62);
     const gridW = cell * grid;
     const gridLeft = contentX + (contentW - gridW) / 2;
-    const gridTop = availTop + (availH - gridW) / 2;
-    const gap = 3;
+    const blockH = stripH + stripGap + gridW;
+    const stripTop = availTop + (availH - blockH) / 2;
+    const gridTop = stripTop + stripH + stripGap;
+
+    // B-I-N-G-O column headers.
+    doc.setFont("helvetica", "bold");
+    for (let c = 0; c < grid; c++) {
+      const x = gridLeft + c * cell;
+      fill(doc, c % 2 === 0 ? C.primary : C.accent);
+      doc.roundedRect(x + gap, stripTop, cell - gap * 2, stripH, 5, 5, "F");
+      text(doc, C.white);
+      doc.setFontSize(Math.min(16, stripH * 0.7));
+      doc.text(columnLetter(c, grid), x + cell / 2, stripTop + stripH / 2, {
+        align: "center",
+        baseline: "middle",
+      });
+    }
 
     for (let r = 0; r < grid; r++) {
       for (let c = 0; c < grid; c++) {
         const x = gridLeft + c * cell;
         const y = gridTop + r * cell;
         const cx = x + cell / 2, cy = y + cell / 2;
-        const word = slots[r * grid + c] || "";
+        const idx = r * grid + c;
         const bx = x + gap, by = y + gap, bs = cell - gap * 2;
 
-        if (word === "FREE") {
+        if (idx === freeIndex) {
           fill(doc, C.accent);
-          draw(doc, C.accent);
+          draw(doc, C.accentDk);
           doc.setLineWidth(0.8);
           doc.roundedRect(bx, by, bs, bs, 6, 6, "FD");
-          star(doc, cx, cy - bs * 0.12, bs * 0.26, bs * 0.11, C.white);
+          star(doc, cx, cy - bs * 0.14, bs * 0.27, bs * 0.115, C.white);
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(Math.min(15, bs * 0.22));
           text(doc, C.white);
-          doc.text("FREE", cx, cy + bs * 0.28, { align: "center" });
+          const lf = fitText(doc, freeLabel.toUpperCase(), bs - 8, bs * 0.42, Math.min(14, bs * 0.2));
+          doc.setFontSize(lf.fontSize);
+          const ly = cy + bs * 0.3 - ((lf.lines.length - 1) * lf.lineH) / 2;
+          lf.lines.forEach((line, i) =>
+            doc.text(line, cx, ly + i * lf.lineH, { align: "center" })
+          );
           continue;
         }
 
-        // Checkerboard tint for visual rhythm.
-        fill(doc, (r + c) % 2 === 0 ? C.altFill : C.white);
+        const word = slots[idx] || "";
+
+        // Checkerboard of cool/warm tints for visual rhythm.
+        fill(doc, (r + c) % 2 === 0 ? C.altFill : C.warmFill);
         draw(doc, C.line);
         doc.setLineWidth(0.8);
         doc.roundedRect(bx, by, bs, bs, 6, 6, "FD");
+
+        // Faint circle in the corner — a target to dab/mark.
+        draw(doc, C.line);
+        doc.setLineWidth(0.5);
+        const mr = Math.max(2.4, bs * 0.07);
+        doc.circle(bx + bs - mr - 3, by + mr + 3, mr, "S");
 
         text(doc, C.ink);
         doc.setFont("helvetica", "normal");
@@ -297,14 +390,15 @@
     drawPatternIcon(doc, contentX, fMid - iconSize / 2, iconSize, grid, maskFor(game.id, grid));
 
     const textX = contentX + iconSize + 12;
+    star(doc, textX + 3, fMid - 3, 4, 1.7, C.accent);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     text(doc, C.primary);
-    doc.text("How to win — " + game.name, textX, fMid - 3, { baseline: "middle" });
+    doc.text("How to win — " + game.name, textX + 12, fMid - 3, { baseline: "middle" });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     text(doc, C.muted);
-    doc.text(game.desc + ".", textX, fMid + 11, { baseline: "middle" });
+    doc.text(game.desc + ".", textX + 12, fMid + 11, { baseline: "middle" });
 
     if (total > 1) {
       doc.setFontSize(8.5);
@@ -329,29 +423,42 @@
       const pct = parseInt(commonPct.value, 10) || 0;
       const gameId = GAMES[gameType.value] ? gameType.value : "line";
       const game = { id: gameId, name: GAMES[gameId].name, desc: GAMES[gameId].desc };
+      const freeLabel = useFree ? ((freeLabelInput.value || "").trim() || "FREE") : "FREE";
 
-      // Word pool: built-in + custom, de-duplicated.
+      // Word pool: built-in + custom, de-duplicated, with blocked words removed.
       const custom = parseCustom(customItems.value);
-      const allWords = dedupe([...DEFAULT_WORDS, ...custom]);
+      const allWords = dedupe([...DEFAULT_WORDS, ...custom]).filter((w) => !blockedWords.has(w));
 
-      if (allWords.length < fillableCells) {
+      // Words the user pinned to appear on EVERY card.
+      const forced = allWords.filter((w) => alwaysWords.has(w));
+
+      if (forced.length > fillableCells) {
         setStatus(
-          `Need at least ${fillableCells} items for a ${grid}×${grid} card, but only have ${allWords.length}. Add more custom items.`,
+          `You've pinned ${forced.length} words to every card, but a ${grid}×${grid} card only has ${fillableCells} usable cells. Unpin some words.`,
           true
         );
         return;
       }
 
-      // How many items are shared across all cards.
+      if (allWords.length < fillableCells) {
+        setStatus(
+          `Need at least ${fillableCells} items for a ${grid}×${grid} card, but only have ${allWords.length}. Add more custom items or block fewer.`,
+          true
+        );
+        return;
+      }
+
+      // Shared items = the pinned words plus enough random ones to hit the %.
       let commonCount = Math.round((pct / 100) * fillableCells);
       commonCount = Math.min(commonCount, fillableCells, allWords.length);
+      commonCount = Math.max(commonCount, forced.length);
 
-      const shuffledAll = shuffle(allWords);
-      const commonItems = shuffledAll.slice(0, commonCount);
-      const fillPool = shuffledAll.slice(commonCount);
+      const others = shuffle(allWords.filter((w) => !alwaysWords.has(w)));
+      const commonItems = shuffle([...forced, ...others.slice(0, commonCount - forced.length)]);
+      const fillPool = others.slice(commonCount - forced.length);
 
-      if (fillPool.length < fillableCells - commonCount) {
-        setStatus("Not enough unique items to fill each card without repeats. Add more items or lower the shared %.", true);
+      if (fillPool.length < fillableCells - commonItems.length) {
+        setStatus("Not enough unique items to fill each card without repeats. Add more items, block fewer, or lower the shared %.", true);
         return;
       }
 
@@ -363,7 +470,7 @@
       for (let i = 0; i < numCards; i++) {
         if (i > 0) doc.addPage();
         const slots = buildCard(commonItems, fillPool, cells, useFree, freeIndex);
-        drawCard(doc, title, slots, grid, i + 1, numCards, game);
+        drawCard(doc, title, slots, grid, i + 1, numCards, game, freeIndex, freeLabel);
       }
 
       const safeTitle = title.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "bingo";
