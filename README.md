@@ -47,18 +47,18 @@ Everything happens in your browser — nothing is uploaded anywhere.
 | ------------ | -------------------------------------------------- |
 | `index.html` | The page and UI                                    |
 | `app.js`     | Card generation logic and PDF rendering            |
-| `words.js`   | The built-in road-trip word list (edit to taste)   |
+| `words.json` | The built-in road-trip word list (edit to taste)   |
 
 ## Customizing the word list
 
-Open `words.js` and edit the `DEFAULT_WORDS` array. The app picks from this list
-plus any custom items you enter in the form.
+Open `words.json` and edit the JSON array of strings. The app fetches this list
+at startup and picks from it plus any custom items you enter in the form.
 
 ## Running locally
 
-Because the app loads `words.js` and `app.js` as separate files, some browsers
-block them when opening `index.html` directly via `file://`. The simplest fix is
-to serve the folder with any static server, for example:
+Because the app fetches `words.json` and loads `app.js` as separate files, some
+browsers block them when opening `index.html` directly via `file://`. The
+simplest fix is to serve the folder with any static server, for example:
 
 ```bash
 python3 -m http.server 8000

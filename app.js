@@ -17,9 +17,31 @@
   const generateBtn = el("generate");
   const status = el("status");
 
-  // Show the built-in list
-  el("defaultCount").textContent = DEFAULT_WORDS.length;
-  el("defaultPreview").textContent = DEFAULT_WORDS.join(" · ");
+  // Built-in word list, loaded from words.json at startup.
+  let DEFAULT_WORDS = [];
+
+  generateBtn.disabled = true;
+  fetch("words.json")
+    .then((res) => {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then((words) => {
+      if (!Array.isArray(words)) throw new Error("words.json is not an array");
+      DEFAULT_WORDS = words;
+      el("defaultCount").textContent = DEFAULT_WORDS.length;
+      el("defaultPreview").textContent = DEFAULT_WORDS.join(" · ");
+      generateBtn.disabled = false;
+    })
+    .catch((err) => {
+      console.error("Failed to load words.json", err);
+      // Still allow generating from custom items alone.
+      generateBtn.disabled = false;
+      setStatus(
+        "Couldn't load the built-in word list (words.json). You can still add your own custom items.",
+        true
+      );
+    });
 
   commonPct.addEventListener("input", () => {
     commonPctVal.textContent = commonPct.value + "%";
